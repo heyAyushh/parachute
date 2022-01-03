@@ -41,7 +41,6 @@ const plugins = [
 ];
 
 const nextConfig = {
-  distDir: "build",
   swcMinify: true,
   images: {
     domains: ['img.icons8.com'],
