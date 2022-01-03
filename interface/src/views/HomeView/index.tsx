@@ -1,51 +1,127 @@
-import { FC } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { FC, useMemo, useState } from "react";
+import { useWallet, useConnection, } from "@solana/wallet-adapter-react";
 import {
   WalletMultiButton,
   WalletConnectButton,
 } from "@solana/wallet-adapter-react-ui";
 import styles from "./index.module.css";
+import axios from 'axios';
+import toast, { Toaster } from 'react-hot-toast';
+import router from 'next/router';
+import { WalletNotConnectedError, WalletSignTransactionError } from "@solana/wallet-adapter-base";
+import {
+  Button, Heading, Modal,
+  ModalBody, ModalCloseButton, ModalContent,
+  ModalFooter, ModalHeader, ModalOverlay,
+  useDisclosure
+} from "@chakra-ui/react";
+import Header from "../components/Header";
 
-export const HomeView: FC = ({}) => {
-  const { publicKey } = useWallet();
+export const HomeView: FC = ({ }) => {
+  const { publicKey, signMessage, connect, connected, disconnecting } = useWallet();
+  const { isOpen, onOpen, onClose } = useDisclosure()
+  const [loadingLetsGo, setLoadingLetsGo] = useState(false);
+  const [challengeStr, setChallengeStr] = useState('');
 
-  const onClick = () => {};
+  if (disconnecting)
+    axios.get('/api/logout').catch(err => console.log(err));
+
+  const loginSign = async () => {
+    try {
+      await connect();
+
+      if (!publicKey || !signMessage) {
+        return
+      }
+
+      setLoadingLetsGo(true);
+
+      const challenge_req = await axios({
+        method: "get",
+        url: `/api/createChallenge?address=${publicKey}`
+      })
+
+      onOpen();
+      setChallengeStr(challenge_req.data.challenge.split(' ')[5]);
+
+      const data = new TextEncoder().encode(challenge_req.data.challenge);
+      const signedMsg = await signMessage(data);
+      // @ts-expect-error typescript doesn't know about UnitArray and Array
+      const signature_array = [...signedMsg];
+
+      setLoadingLetsGo(false);
+
+      const backend_res_raw = await axios({
+        method: "post",
+        url: `/api/submitChallenge`,
+        data: {
+          address: publicKey.toString(),
+          signature: signature_array
+        }
+      });
+
+      toast.success('Loggedin! ');
+      router.push('/start ');
+    } catch (err: any) {
+      setLoadingLetsGo(false);
+      if (err instanceof WalletSignTransactionError)
+        toast.error('Verification cancelled!');
+      else if (err instanceof WalletNotConnectedError)
+        toast.error('Please connect the wallet above!');
+      else
+        toast.error('Something went wrong!');
+    }
+  };
+
 
   return (
-    <div className="container mx-auto max-w-6xl p-8 2xl:px-0">
-      <div className={styles.container}>
-        <div className="navbar mb-2 shadow-lg bg-neutral text-neutral-content rounded-box">
-          <div className="flex-none">
-            <button className="btn btn-square btn-ghost">
-              <span className="text-4xl">🦤</span>
-            </button>
-          </div>
-          <div className="flex-1 px-2 mx-2">
-            <span className="text-lg font-bold">Caw Caw</span>
-          </div>
-          <div className="flex-none">
-            <WalletMultiButton className="btn btn-ghost" />
-          </div>
-        </div>
+    <div>
+      <Header />
+      <div className="container mx-auto max-w-6xl p-8 2xl:px-0">
+        <div className={styles.container}>
 
-        <div className="text-center pt-2">
-          <div className="hero min-h-16 py-20">
-            <div className="text-center hero-content">
-              <div className="max-w-md">
-                <h1 className="mb-5 text-5xl font-bold">
-                  Hello Solana <SolanaLogo /> World!
-                </h1>
-                <p className="mb-5">
-                  This scaffold includes awesome tools for rapid development and
-                  deploy dapps to Solana: Next.JS, TypeScript, TailwindCSS,
-                  Daisy UI.
-                </p>
-                <p className="mb-5">
-                  Sollana wallet adapter is connected and ready to use.
-                </p>
-                <p>
-                  {publicKey ? <>Your address: {publicKey.toBase58()}</> : null}
-                </p>
+          <Modal isOpen={isOpen} onClose={onClose}>
+            <ModalOverlay />
+            <ModalContent>
+              <ModalHeader> Verify your Connection to parachute </ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                Make sure your message is <br />
+                <Heading>{challengeStr}</Heading>
+              </ModalBody>
+
+              <ModalFooter>
+                <Button colorScheme="blue" mr={3} onClick={onClose}>
+                  Okay
+                </Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
+
+          <div className="text-center pt-2">
+            <div className="hero min-h-16 py-20">
+              <div className="text-center hero-content">
+                <div className="max-w-md">
+                  <h1 className="mb-5 text-5xl font-bold">
+                    Parachute for <SolanaLogo />
+                  </h1>
+                  <p className="mb-5">
+                    This web app is a Airdropping tool for solana.
+                    Can be used for airdrop campaigns, or any use case that needs transfers to a large number of addresses.
+                  </p>
+
+                  <button className={`btn btn-primary mt-20 mb-20 ${loadingLetsGo ? 'loading' : ''}`}
+                    disabled={!connected}
+                    onClick={async (e) => {
+                      if (!e.isDefaultPrevented()) {
+                        try {
+                          await loginSign();
+                        } catch (err) {
+                          toast.error('There was some error, Please try again later.')
+                        }
+                      }
+                    }}> Lets goooooo </button>
+                </div>
               </div>
             </div>
           </div>

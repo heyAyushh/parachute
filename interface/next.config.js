@@ -43,6 +43,9 @@ const plugins = [
 const nextConfig = {
   distDir: "build",
   swcMinify: true,
+  images: {
+    domains: ['img.icons8.com'],
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback.fs = false;
