@@ -29,11 +29,11 @@ const wrap = (logger: pino.Logger) => {
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 const getLogger = () => (isDevelopment ? wrap(pino({
- level: process.env.DEV_LOG_LEVEL,
+ level: process.env.DEV_LOG_LEVEL || 'debug',
  prettyPrint: { colorize: true },
  timestamp: true,
 })) : wrap(pino({
- level: process.env.PROD_LOG_LEVEL,
+ level: process.env.PROD_LOG_LEVEL || 'info',
  timestamp: pino.stdTimeFunctions.isoTime,
 })));
 

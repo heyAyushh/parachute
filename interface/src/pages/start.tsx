@@ -65,6 +65,8 @@ export default function Start() {
           setRetryPayment(true);
           setTransferring(false);
 
+          console.log(err);
+
           toast({
             title: `Transferring sol failed!`,
             status: 'error',
